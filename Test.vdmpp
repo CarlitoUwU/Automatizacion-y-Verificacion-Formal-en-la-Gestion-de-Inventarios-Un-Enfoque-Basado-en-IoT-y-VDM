@@ -1,0 +1,188 @@
+
+class Almacen
+types
+    public Productos = <HARINA> | <AZUCAR> | <HUEVO> | <SAL> | <MANTECA>;
+    public AlmacenId = token;
+
+instance variables
+    private almacenId: AlmacenId;
+    private stock: map Productos to nat;
+    private minStock: map Productos to nat;
+
+operations
+    public Almacen: AlmacenId ==> Almacen
+    Almacen(newAlmacenId) == (
+        almacenId := newAlmacenId;
+        stock := {|->};
+        minStock := {|->};
+    );
+
+    public AddProducto: Productos * nat * nat ==> bool
+    AddProducto(producto, cantidad, min) == (
+        stock := stock ++ {producto |-> cantidad};
+        minStock := minStock ++ {producto |-> min};
+        return true;
+    ) pre not verifExisteProducto(producto, stock) and cantidad > 0 and min > 0;    
+    
+    public AddProducto: Productos * nat ==> bool
+    AddProducto(producto, cantidad) == (
+        stock := stock ++ {producto |-> stock(producto) + cantidad};
+        return true;
+    ) pre verifExisteProducto(producto, stock) and cantidad > 0;
+
+    public orderProducto: Productos * nat ==> bool
+    orderProducto(producto, cantidad) == (
+        stock := stock ++ {producto |-> stock(producto) - cantidad};
+        return true;
+    ) pre verifExisteProducto(producto, stock) and stock(producto) >= cantidad;
+
+    public inMinStock: Productos ==> bool
+    inMinStock(producto) == (
+        return stock(producto) <= minStock(producto);
+    ) pre verifExisteProducto(producto, stock);
+
+
+    public GetAlmacenId: () ==> AlmacenId
+    GetAlmacenId() == (
+        return almacenId;
+    );
+
+    public ExisteProducto: Productos ==> bool
+    ExisteProducto(producto) == (
+        return producto in set dom stock;
+    );
+
+    public hayStock: Productos * nat ==> bool
+    hayStock(producto, cantidad) == (
+        return stock(producto) >= cantidad;
+    );
+
+functions
+    public verifExisteProducto: Productos * map Productos to nat -> bool
+    verifExisteProducto(producto, stock) == (
+        producto in set dom stock
+    );
+
+end Almacen
+
+class System
+
+instance variables
+    private almacenes: map Almacen`AlmacenId to Almacen;
+    inv SystemInv(almacenes);
+
+operations
+
+    public System: set of Almacen ==> System
+    System(almacenesSet) == (
+        almacenes := {a.GetAlmacenId() |-> a | a in set almacenesSet};
+    ) pre forall a, b in set almacenesSet & a <> b => a.GetAlmacenId() <> b.GetAlmacenId();
+
+    public AddAlmacen: Almacen ==> bool
+    AddAlmacen(almacen) == (
+        almacenes := almacenes ++ {almacen.GetAlmacenId() |-> almacen};
+        return true;
+    ) pre not ExistsAlmacen(almacen.GetAlmacenId(), almacenes);
+
+    public doOrder: Almacen * Almacen`Productos * nat ==> bool
+    doOrder (almacen, producto, cantidad) == (
+        if(almacen.hayStock(producto, cantidad) and almacen.orderProducto(producto, cantidad)) then (
+            if almacen.inMinStock(producto) then (
+                dcl aux :bool;
+                aux := doPedido(almacen, producto, cantidad);                
+            );
+
+            return true;
+        );
+
+        return false;
+    ) pre ExistsAlmacen(almacen.GetAlmacenId(), almacenes) and almacen.ExisteProducto(producto);
+
+    public doOrder: Almacen`Productos * nat ==> bool
+    doOrder(producto, cantidad) == (
+        for all idAlmacen in set dom almacenes do (
+            if almacenes(idAlmacen).ExisteProducto(producto) and almacenes(idAlmacen).hayStock(producto, cantidad)
+            and almacenes(idAlmacen).orderProducto(producto, cantidad) then ( 
+                if almacenes(idAlmacen).inMinStock(producto) then (
+                    doPedido(almacenes(idAlmacen), producto, 10);
+                );
+
+                return true;
+            );
+        );
+
+        return false;
+    );
+
+    private doPedido: Almacen * Almacen`Productos * nat ==> bool
+    doPedido(almacen, producto, cantidad) == (
+        almacen.AddProducto(producto, cantidad); 
+    );
+
+functions
+    SystemInv: map Almacen`AlmacenId to Almacen -> bool
+    SystemInv(almacenes) == (
+        forall a in set dom almacenes & almacenes(a).GetAlmacenId() = a
+    );
+
+    ExistsAlmacen: Almacen`AlmacenId * map Almacen`AlmacenId to Almacen -> bool
+    ExistsAlmacen(almacenId, almacenes) == (
+        almacenId in set dom almacenes
+    );
+
+end System
+
+class Test
+types
+    public Productos = Almacen`Productos;
+
+instance variables
+    private almacen1: Almacen;
+    private almacen2: Almacen;
+    private almacen3: Almacen;
+    private system: System;
+    private exitoso: bool;
+
+operations
+    public run: () ==> seq of char
+    run() == test();
+
+    private test: () ==> seq of char
+    test() == (
+        almacen1 := new Almacen(mk_token("almacen1"));
+        almacen2 := new Almacen(mk_token("almacen2"));
+        almacen3 := new Almacen(mk_token("almacen3"));
+        
+        exitoso := almacen1.AddProducto(<HARINA>, 10, 5);
+        exitoso := almacen1.AddProducto(<HARINA>, 10);
+        exitoso := almacen1.AddProducto(<AZUCAR>, 10, 5);  
+        -- harina 20, azucar 10
+
+        exitoso := almacen2.AddProducto(<HUEVO>, 10, 5);
+        exitoso := almacen2.AddProducto(<HUEVO>, 10);
+        exitoso := almacen2.AddProducto(<SAL>, 10, 5);
+        exitoso := almacen2.AddProducto(<MANTECA>, 10, 5);
+        -- huevo 20, sal 10, manteca 10
+
+        exitoso := almacen3.AddProducto(<HARINA>, 10, 5);
+        exitoso := almacen3.AddProducto(<SAL>, 10, 5);
+        exitoso := almacen3.AddProducto(<SAL>, 10);
+        -- harina 10, sal 20
+        
+        system := new System({almacen1, almacen2});
+        exitoso := system.AddAlmacen(almacen3);
+        
+        exitoso := system.doOrder(almacen3, <HARINA>, 8);
+        exitoso :=system.doOrder(almacen1, <AZUCAR>, 15);
+        exitoso := system.doOrder(<AZUCAR>, 20);
+        exitoso := system.doOrder(<HARINA>, 11);        
+        exitoso := system.doOrder(<SAL>, 5);
+        exitoso := system.doOrder(<MANTECA>, 5);
+
+        return "All test passed";
+    );
+
+
+end Test
+
+
