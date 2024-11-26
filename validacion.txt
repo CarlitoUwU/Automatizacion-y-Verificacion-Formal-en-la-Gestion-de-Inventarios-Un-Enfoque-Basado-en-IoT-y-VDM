@@ -1,0 +1,29 @@
++ Productos: Quote
++ AlmacenId: token
+- almacenId: AlmacenId
+- stock: map Productos to nat
+- minStock: map Productos to nat
+
+
++ Almacen(AlmacenId): Almacen
++ AddProducto(Productos, nat, nat): bool
++ AddProducto(Productos, nat): bool
++ orderProducto(Productos, nat): bool
++ inMinStock(Productos): bool
++ GetAlmacenId(): AlmacenId
++ ExisteProducto(Productos): bool
++ hayStock(Productos, nat): bool
++ verifExisteProducto(Productos, map Productos to nat): bool
+
+system
+- almacenes: map Almacen`AlmacenId to Almacen;
+
+
++ System(set of Almacen): System
++ AddAlmacen(Almacen): bool
++ doOrder(Almacen, Almacen`Productos, nat): bool
++ doOrder(Almacen`Productos, nat): bool
+- doPedido(Almacen, Almacen`Productos, nat): bool
+- SystemInv(map Almacen`AlmacenId to Almacen): bool
+- ExistsAlmacen(Almacen`AlmacenId, map Almacen`AlmacenId to Almacen): bool
+
